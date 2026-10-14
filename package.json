@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-status-bar",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSH 客户端插件：在输入框上方维护一条状态条（比输入卡片略窄、居中、与卡片上沿贴合），向其它客户端插件提供 inputStatusBar 段注册面。不含任何业务逻辑。",
   "type": "module",
   "main": "./index.js",
@@ -77,7 +77,7 @@
   "dsh": {
     "id": "dsh-status-bar",
     "name": "输入框状态条",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "repo": "vianvio/dsh-plugin-status-bar",
     "permissions": "客户端状态条容器：只读页面主题令牌与 composer 几何令牌，在 conversation.input.dock 里渲染一条横条并对外提供 inputStatusBar 注册面，不注入提示词、不注册工具、不写任何会话数据。",
     "bundle": {

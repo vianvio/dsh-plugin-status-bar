@@ -135,12 +135,14 @@ function renderStatusBar(options = {}) {
     tone: "pass",
     title: "Agent Mesh 节点"
   });
+  /* 右侧这一段刻意**不带版本号**：演示图进了 README 与 npm 包，写版本号就会随发版过期。
+   * 内容用 README 里那张示意图的说法，只是示意，不是任何插件的事实。 */
   bar.register({
-    id: "status-bar-selftest",
+    id: "market",
     order: 200,
     align: "end",
-    label: "状态条",
-    status: "0.2.0",
+    label: "插件市场",
+    status: "3 条更新",
     tone: "idle"
   });
 
