@@ -1,0 +1,79 @@
+{
+  "name": "dsh-plugin-status-bar",
+  "version": "0.2.0",
+  "description": "DSH 客户端插件：在输入框上方维护一条状态条（比输入卡片略窄、居中、与卡片上沿贴合），向其它客户端插件提供 inputStatusBar 段注册面。不含任何业务逻辑。",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./client.js": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "docs",
+    "scripts"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "harness:check": "node --check index.js && node --check client.js",
+    "verify": "node scripts/verify_status_bar.mjs",
+    "compat": "node scripts/compat_status_bar.mjs",
+    "render": "node scripts/render_status_bar.mjs",
+    "smoke:client": "node scripts/smoke_status_bar.mjs",
+    "gate": "npm run harness:check && npm test && npm run verify && npm run compat && npm run smoke:client && npm run render",
+    "prepublishOnly": "npm run harness:check && npm test && npm run verify"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "status-bar",
+    "composer",
+    "slot"
+  ],
+  "license": "MIT",
+  "author": "vianvio",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vianvio/dsh-plugin-status-bar.git"
+  },
+  "homepage": "https://github.com/vianvio/dsh-plugin-status-bar#readme",
+  "bugs": {
+    "url": "https://github.com/vianvio/dsh-plugin-status-bar/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "id": "dsh-status-bar",
+    "name": "输入框状态条",
+    "version": "0.2.0",
+    "repo": "vianvio/dsh-plugin-status-bar",
+    "permissions": "客户端状态条容器：只读页面主题令牌与 composer 几何令牌，在 conversation.input.dock 里渲染一条横条并对外提供 inputStatusBar 注册面，不注入提示词、不注册工具、不写任何会话数据。",
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}
