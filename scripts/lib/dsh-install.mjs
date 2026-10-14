@@ -385,11 +385,59 @@ export class DshInstall {
    */
   clientDeclarationFields() {
     const source = this.clientFile("dsh-client-modules", "lib/index.js");
-    const at = source.indexOf("function parseDshClient(");
-    if (at === -1) throw new Error("找不到 parseDshClient");
-    const body = source.slice(at, at + 1600);
+    const body = functionBody(source, "parseDshClient");
     return [...body.matchAll(/decl\.([A-Za-z]+)/g)].map((match) => match[1]).filter((value, index, all) => all.indexOf(value) === index);
   }
+}
+
+/**
+ * 抠出一个具名函数的完整函数体（按括号/花括号配对，不用字符数截断）。
+ *
+ * 拿固定长度 `slice(at, at + 1800)` 去"读宿主的实现"会把下一个函数的内容也吞进来，
+ * 于是一条"这段实现里不该出现某种写法"的断言会被邻座的代码喂出假绿/假红。
+ *
+ * 注意要**先跳过形参表**再找函数体的 `{`：签名里可能有默认值（`exemptions = {}`），
+ * 那个 `{}` 会先被当成函数体，于是整个断言在一个空对象上通过——比报错更糟。
+ *
+ * @param source - 完整源码。
+ * @param name - 函数名。
+ * @returns 从 `function` 到配对右花括号的文本。
+ * @throws 当找不到函数，或括号不配对。
+ */
+export function functionBody(source, name) {
+  const at = source.indexOf(`function ${name}(`);
+  if (at === -1) throw new Error(`源码里没有 function ${name}(`);
+
+  /* 1) 配对形参表的圆括号 */
+  const parenOpen = source.indexOf("(", at);
+  let parenDepth = 0;
+  let parenClose = -1;
+  for (let index = parenOpen; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "(") parenDepth += 1;
+    else if (char === ")") {
+      parenDepth -= 1;
+      if (parenDepth === 0) {
+        parenClose = index;
+        break;
+      }
+    }
+  }
+  if (parenClose === -1) throw new Error(`function ${name} 的形参表不配对`);
+
+  /* 2) 形参表之后的第一个 { 才是函数体 */
+  const open = source.indexOf("{", parenClose);
+  if (open === -1) throw new Error(`function ${name} 后面没有函数体`);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(open, index + 1);
+    }
+  }
+  throw new Error(`function ${name} 的花括号不配对`);
 }
 
 /**

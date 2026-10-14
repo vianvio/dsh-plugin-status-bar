@@ -115,3 +115,18 @@ test('@deepseek-ai/dsh* 的 peer 区间是带上下界的真闸门，不是空�
   }
   assert.equal(manifest.peerDependencies?.['@deepseek-ai/cordis'] !== undefined, true, 'cordis 版本也一并声明')
 })
+
+test('peer 全部标成 optional：挡住 npm 的自动安装，但闸门仍然有效', () => {
+  // npm 7+ 会**自动安装**非 optional 的 peer；这三个包由 DSH 运行时提供，从 registry 装没有意义。
+  // 实测不标 optional 时 `npm install` 会拉进整个 DSH 依赖树（512MB、含 koffi/node-pty 这类原生模块）。
+  // 闸门之所以还在，是因为宿主 preflight 只看 peerDependencies 区间、不看 peerDependenciesMeta——
+  // 这一点由 scripts/compat_status_bar.mjs 对着安装版 DSH 断言（而不是靠这里的注释）。
+  const gate = Object.keys(manifest.peerDependencies ?? {})
+  for (const name of gate) {
+    assert.equal(
+      manifest.peerDependenciesMeta?.[name]?.optional,
+      true,
+      `${name} 必须标 optional，否则 npm install 会把整个 DSH 依赖树拉进仓库`,
+    )
+  }
+})

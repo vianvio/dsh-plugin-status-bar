@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DshInstall, materializePackage } from "./lib/dsh-install.mjs";
+import { DshInstall, functionBody, materializePackage } from "./lib/dsh-install.mjs";
 import { readHostFrame } from "./lib/host-frame.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -181,7 +181,7 @@ rmSync(semverRoot, { recursive: true, force: true });
   const appBoot = dsh.clientFile("dsh-app-boot", "lib/index.js");
   const at = appBoot.indexOf("function evaluatePluginCompatibility(");
   check(at !== -1, "宿主里仍有 evaluatePluginCompatibility（preflight 的判定函数）");
-  const body = at === -1 ? "" : appBoot.slice(at, at + 1800);
+  const body = at === -1 ? "" : functionBody(appBoot, "evaluatePluginCompatibility");
   check(
     body.includes('"@deepseek-ai/dsh"') && body.includes('"@deepseek-ai/dsh-"'),
     "preflight 仍只看 @deepseek-ai/dsh / @deepseek-ai/dsh-* 的 peerDependencies",
@@ -189,6 +189,17 @@ rmSync(semverRoot, { recursive: true, force: true });
   );
   check(body.includes("includePrerelease: true"), "preflight 判预发布版本时仍带 includePrerelease");
   check(body.includes("peerDependencies"), "preflight 仍从 peerDependencies 取区间");
+
+  /* 本包把 @deepseek-ai/dsh* 的 peer 标成了 optional——理由是 npm 会**自动装**非 optional 的
+   * peer，而这三个包由 DSH 运行时提供（`npm install` 会把整个 DSH 依赖树拉进仓库：实测 512MB、
+   * 含 koffi/node-pty 这类原生模块）。这道闸门之所以还能用，正因为宿主 preflight 只看
+   * `peerDependencies` 区间、**不看** `peerDependenciesMeta.optional`。
+   * 宿主哪天开始尊重 optional，这里会红——那时要么去掉 peerDependenciesMeta，要么换声明位置。 */
+  check(
+    !body.includes("peerDependenciesMeta") && !body.includes("optional"),
+    "preflight 不看 peerDependenciesMeta.optional（所以标成 optional 不会关掉这道闸门）",
+    "宿主的判定开始尊重 optional 了：本包的 @deepseek-ai/dsh* 就不能再标 optional"
+  );
 }
 
 /* ── 结果 ─────────────────────────────────────────────────────────────────── */

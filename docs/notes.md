@@ -108,3 +108,61 @@ git push --follow-tags
 本机默认 registry 是 npmmirror，不固定的话会把"发到哪"交给环境（镜像站通常不接受发布，报错还很难读）。
 
 npm 不允许同名同版本重发：**改了东西必须先 `npm version`**，否则 `publish` 会被拒（`EPUBLISHCONFLICT`）。
+
+### 2FA 账号的第一次发布会"暂存"，看起来像失败
+
+账号开了 2FA（写操作也要presence）时，`npm publish` 不会当场把版本放上去：
+
+```
+notice Publishing to https://registry.npmjs.org/ with tag latest and public access
++ dsh-plugin-status-bar@0.2.0          ← 退出码 0，看着像成功
+```
+但 debug log 里那次请求是 **`PUT … 202 Accepted`**（不是 201），注册表上只有 npm 自己发的占位版本：
+
+```bash
+curl -s https://registry.npmjs.org/<pkg> | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['dist-tags'],list(d['versions']))"
+# {'latest': '0.0.0-stage'} ['0.0.0-stage']        ← "Temporary package placeholder for staged publishing"
+```
+
+这时包**还装不了**（`npm i <pkg>` 会装到那个占位空壳，没有 DSH 元数据）。要发布者用 2FA 设备确认一次：
+
+```bash
+npm stage list                                  # 拿 stage-id
+npm stage approve <stage-id>                    # 需要 2FA（--otp=<码> 也行）
+```
+
+`npm stage list` 用的是 granular token 的可见范围——**它可能列不出这条**（本包第一次发布时就是
+`{"items":[],"total":0}`，而注册表上占位版本确实在）。列不出来就走 npm 网站该包页面上的待批准提示；
+再不行就 `npm publish --otp=<6 位码>` 重发一次（版本还没上线，不会撞 `EPUBLISHCONFLICT`）。
+
+确认通过后 `latest` 指向真版本，占位版本会留在 `versions` 列表里（无引用、无害；想清掉是
+`npm unpublish <pkg>@0.0.0-stage`）。
+
+判断"到底上没上去"只认注册表的 `dist-tags` 与 `versions`，别信 CLI 那行 `+ pkg@version`。
+
+### `test/` 不进包，所以包里的 `npm test` 是空转
+
+`files` 白名单里没有 `test/`（发布契约是维护者看的，跟使用者无关；`dsh-plugin-drop-path` 同样如此）。
+副作用是在 `node_modules/<pkg>` 里跑 `npm test` 会报 `tests 0 / fail 0`——**那是个假绿**，别当成通过。
+装下来的包里能跑的检查是 `node scripts/verify_status_bar.mjs` 与
+`node scripts/compat_status_bar.mjs`（后者要本机装有 DSH），这两个都随包发出去了。
+
+### `peerDependencies` 必须配 `peerDependenciesMeta.optional`
+
+这三个 peer（`@deepseek-ai/cordis` / `dsh` / `dsh-client-ui-conversation`）由 DSH 运行时提供，
+**不该由 npm 去装**——但 npm 7+ 默认会**自动安装**非 optional 的 peer。踩到的实况：
+
+```
+npm install          # 只想装 react/react-dom
+# → 512MB node_modules、613 条 lockfile、koffi / node-pty 这类要编译的原生模块
+```
+
+标成 optional 之后是 5 个包、4.9MB。**闸门不会因此失效**：宿主 preflight 只看
+`peerDependencies` 的区间，不读 `peerDependenciesMeta`——这条由 `scripts/compat_status_bar.mjs`
+对着安装版 DSH 里的 `evaluatePluginCompatibility` 断言（它同时确认那段实现里没有出现
+`peerDependenciesMeta` / `optional`；哪天出现了，说明 optional 会关掉闸门，这个标法就得改）。
+
+顺带一条教训：**抠函数体不能用 `slice(at, at + 1800)`**。一来会把下一个函数吞进来；
+二来签名里的默认值（`exemptions = {}`）会让"从第一个 `{` 开始配对"直接返回一个空对象——
+断言于是在空对象上通过，比报错更糟。要按圆括号/花括号配对，并先跳过形参表。
+
